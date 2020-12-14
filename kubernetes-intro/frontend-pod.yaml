@@ -1,0 +1,16 @@
+# kubectl run frontend --image abvgdeej/frontend --restart=Never --dry-run -o yaml > C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-intro\frontend-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: frontend
+  name: frontend
+spec:
+  containers:
+    - image: abvgdeej/frontend
+      name: frontend
+      resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}
