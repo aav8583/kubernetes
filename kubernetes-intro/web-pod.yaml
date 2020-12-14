@@ -1,0 +1,25 @@
+apiVersion: v1                  # Версия API
+kind: Pod                       # Объект, который создаем
+metadata:
+  name: web                     # Название Pod
+  labels:                       # Метки в формате key: value
+    app: web
+spec:                           # Описание Pod
+  containers:                   # Описание контейнеров внутри Pod
+    - name: web                 # Название контейнера
+      image: abvgdeej/web-app   # Образ из которого создается контейнер
+#      ports:
+#        - containerPort: 10001
+      volumeMounts:
+        - name: app
+          mountPath: /app
+  initContainers:               # Контейнеры для инициализации
+    - name: init-web
+      image: library/busybox:1.31.0
+      command: ['sh', '-c', 'wget -O- https://tinyurl.com/otus-k8s-intro | sh']
+      volumeMounts:
+        - name: app
+          mountPath: /app
+  volumes:
+    - name: app
+      emptyDir: {}
