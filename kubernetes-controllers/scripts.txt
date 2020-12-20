@@ -1,0 +1,179 @@
+kubectl apply -f .\paymentservice-replicaset.yaml | kubectl get pods -l app=paymentservice -w
+kubectl get replicaset paymentservice -o=jsonpath='{.spec.template.spec.containers[0].image}'
+kubectl get pods -l app=paymentservice -o=jsonpath='{.items[0:3].spec.containers[0].image}'
+kubectl delete pods -l app=paymentservice | kubectl get pods -l app=paymentservice -w
+
+kubectl apply -f .\paymentservice-deployment.yaml
+deployment.apps/paymentservice created
+
+kubectl get pods -l app=paymentservice -w
+NAME                              READY   STATUS        RESTARTS   AGE
+paymentservice-6f4dd9f457-7vj58   1/1     Running       0          8s
+paymentservice-6f4dd9f457-fnfbc   1/1     Running       0          10s
+paymentservice-6f4dd9f457-xqjj5   1/1     Running       0          8s
+paymentservice-bqc66              1/1     Terminating   0          89s
+paymentservice-fjbbq              1/1     Terminating   0          89s
+paymentservice-z44j5              1/1     Terminating   0          89s
+
+kubectl get pods -l app=paymentservice -w
+NAME                              READY   STATUS        RESTARTS   AGE
+paymentservice-6f4dd9f457-7vj58   1/1     Running       0          8s
+paymentservice-6f4dd9f457-fnfbc   1/1     Running       0          10s
+paymentservice-6f4dd9f457-xqjj5   1/1     Running       0          8s
+paymentservice-bqc66              1/1     Terminating   0          89s
+paymentservice-fjbbq              1/1     Terminating   0          89s
+paymentservice-z44j5              1/1     Terminating   0          89s
+paymentservice-bqc66              0/1     Terminating   0          112s
+paymentservice-fjbbq              0/1     Terminating   0          112s
+paymentservice-z44j5              0/1     Terminating   0          113s
+paymentservice-fjbbq              0/1     Terminating   0          113s
+paymentservice-fjbbq              0/1     Terminating   0          113s
+paymentservice-fjbbq              0/1     Terminating   0          113s
+paymentservice-z44j5              0/1     Terminating   0          2m3s
+paymentservice-z44j5              0/1     Terminating   0          2m3s
+paymentservice-bqc66              0/1     Terminating   0          2m3s
+paymentservice-bqc66              0/1     Terminating   0          2m3s
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods
+NAME                              READY   STATUS    RESTARTS   AGE
+frontend-4m7w2                    1/1     Running   0          35m
+frontend-4zrj7                    1/1     Running   0          35m
+frontend-75rbs                    1/1     Running   0          35m
+paymentservice-6f4dd9f457-7vj58   1/1     Running   0          2m50s
+paymentservice-6f4dd9f457-fnfbc   1/1     Running   0          2m52s
+paymentservice-6f4dd9f457-xqjj5   1/1     Running   0          2m50s
+
+# обновление манифеста до v0.0.2
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl apply -f paymentservice-deployment.yaml | kubectl get pods -l app=paymentservice -w
+NAME                              READY   STATUS              RESTARTS   AGE
+paymentservice-6f4dd9f457-7vj58   1/1     Running             0          4m24s
+paymentservice-6f4dd9f457-fnfbc   1/1     Running             0          4m26s
+paymentservice-6f4dd9f457-xqjj5   1/1     Running             0          4m24s
+paymentservice-rr8qd              0/1     ContainerCreating   0          0s
+paymentservice-rr8qd              1/1     Running             0          1s
+paymentservice-6f4dd9f457-7vj58   1/1     Terminating         0          4m25s
+paymentservice-qxlcm              0/1     Pending             0          0s
+paymentservice-qxlcm              0/1     Pending             0          0s
+paymentservice-qxlcm              0/1     ContainerCreating   0          1s
+paymentservice-qxlcm              1/1     Running             0          1s
+paymentservice-6f4dd9f457-xqjj5   1/1     Terminating         0          4m26s
+paymentservice-rdjml              0/1     Pending             0          0s
+paymentservice-rdjml              0/1     Pending             0          0s
+paymentservice-rdjml              0/1     ContainerCreating   0          0s
+paymentservice-rdjml              1/1     Running             0          2s
+paymentservice-6f4dd9f457-fnfbc   1/1     Terminating         0          4m30s
+paymentservice-6f4dd9f457-7vj58   0/1     Terminating         0          4m56s
+paymentservice-6f4dd9f457-xqjj5   0/1     Terminating         0          4m57s
+paymentservice-6f4dd9f457-xqjj5   0/1     Terminating         0          4m58s
+paymentservice-6f4dd9f457-xqjj5   0/1     Terminating         0          4m58s
+paymentservice-6f4dd9f457-fnfbc   0/1     Terminating         0          5m1s
+paymentservice-6f4dd9f457-7vj58   0/1     Terminating         0          5m2s
+paymentservice-6f4dd9f457-7vj58   0/1     Terminating         0          5m2s
+paymentservice-6f4dd9f457-fnfbc   0/1     Terminating         0          5m4s
+paymentservice-6f4dd9f457-fnfbc   0/1     Terminating         0          5m4s
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods -l app=paymentservice -w
+NAME                   READY   STATUS    RESTARTS   AGE
+paymentservice-qxlcm   1/1     Running   0          2m20s
+paymentservice-rdjml   1/1     Running   0          2m19s
+paymentservice-rr8qd   1/1     Running   0          2m21s
+
+Убедитесь что:
+Все новые pod развернуты из образа v0.0.2
+Создано два ReplicaSet:
+Один (новый) управляет тремя репликами pod с образом
+v0.0.2
+Второй (старый) управляет нулем реплик pod с образом v0.0.1
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get rs
+NAME                        DESIRED   CURRENT   READY   AGE
+frontend                    3         3         3       40m
+paymentservice              3         3         3       41m
+paymentservice-6f4dd9f457   0         0         0       7m53s
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl rollout history deployment paymentservice
+deployment.apps/paymentservice
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get replicaset paymentservice -o=jsonpath='{.spec.template.spec.containers[0].image}'
+abvgdeej/paymentservice:v0.0.2
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods -l app=paymentservice -o=jsonpath='{.items[0:3].spec.containers[0].image}'
+abvgdeej/paymentservice:v0.0.2 abvgdeej/paymentservice:v0.0.2 abvgdeej/paymentservice:v0.0.2
+
+Представим, что обновление по каким-то причинам произошло
+неудачно и нам необходимо сделать откат. Kubernetes
+предоставляет такую возможность:
+
+kubectl rollout undo deployment paymentservice --to-revision=1 | kubectl get rs -l app=paymentservice -w
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods -l app=paymentservice -o=jsonpath='{.items[0:3].spec.containers[0].image}'
+abvgdeej/paymentservice:v0.0.1 abvgdeej/paymentservice:v0.0.1 abvgdeej/paymentservice:v0.0.1
+
+
+Deployment | Задание со *
+https://habr.com/ru/company/flant/blog/471620/
+
+С использованием параметров maxSurge и maxUnavailable
+самостоятельно реализуйте два следующих сценария
+развертывания:
+
+Аналог blue-green:
+1. Развертывание трех новых pod
+2. Удаление трех старых pod
+
+Reverse Rolling Update:
+1. Удаление одного старого pod
+2. Создание одного нового pod
+
+Probes
+
+kubectl apply -f .\frontend-deployment.yaml
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods -l app=frontend  -w
+NAME                       READY   STATUS    RESTARTS   AGE
+frontend-4m7w2             1/1     Running   0          124m
+frontend-4zrj7             1/1     Running   0          124m
+frontend-69f56bbdd-c7gkg   1/1     Running   0          28s
+frontend-69f56bbdd-zrbfd   0/1     Running   0          10s
+frontend-69f56bbdd-zrbfd   1/1     Running   0          22s
+frontend-4m7w2             1/1     Terminating   0          124m
+frontend-69f56bbdd-4rf6j   0/1     Pending       0          0s
+frontend-69f56bbdd-4rf6j   0/1     Pending       0          0s
+frontend-69f56bbdd-4rf6j   0/1     ContainerCreating   0          0s
+frontend-4m7w2             0/1     Terminating         0          124m
+frontend-4m7w2             0/1     Terminating         0          124m
+frontend-4m7w2             0/1     Terminating         0          124m
+frontend-69f56bbdd-4rf6j   0/1     Running             0          5s
+frontend-69f56bbdd-4rf6j   1/1     Running             0          21s
+frontend-4zrj7             1/1     Terminating         0          124m
+frontend-4zrj7             0/1     Terminating         0          124m
+frontend-4zrj7             0/1     Terminating         0          124m
+frontend-4zrj7             0/1     Terminating         0          124m
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pods
+NAME                              READY   STATUS    RESTARTS   AGE
+frontend-69f56bbdd-4rf6j          1/1     Running   0          58s
+frontend-69f56bbdd-c7gkg          1/1     Running   0          98s
+frontend-69f56bbdd-zrbfd          1/1     Running   0          80s
+paymentservice-6f4dd9f457-6pscj   1/1     Running   0          77m
+paymentservice-6f4dd9f457-qskd6   1/1     Running   0          77m
+paymentservice-6f4dd9f457-vmmdw   1/1     Running   0          77m
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl apply -f .\node-exporter-daemonset.yaml
+
+PS C:\kubernetes\otus-course\homeworks\abvgdeej_platform\kubernetes-controllers> kubectl get pod -o wide
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                  NOMINATED NODE   READINESS GATES
+frontend-7bb98b7497-g7npc         1/1     Running   0          7m44s   10.244.3.10   kind-worker           <none>           <none>
+frontend-7bb98b7497-hl2vx         1/1     Running   0          7m16s   10.244.4.10   kind-worker3          <none>           <none>
+frontend-7bb98b7497-wlprt         1/1     Running   0          7m26s   10.244.5.12   kind-worker2          <none>           <none>
+node-exporter-2vvhf               2/2     Running   0          3m7s    172.18.0.7    kind-control-plane2   <none>           <none>
+node-exporter-88gqb               2/2     Running   0          3m7s    172.18.0.2    kind-worker3          <none>           <none>
+node-exporter-gbvv4               2/2     Running   0          3m7s    172.18.0.4    kind-worker           <none>           <none>
+node-exporter-gmnv4               2/2     Running   0          3m7s    172.18.0.3    kind-worker2          <none>           <none>
+node-exporter-r5qbh               2/2     Running   0          3m7s    172.18.0.6    kind-control-plane3   <none>           <none>
+node-exporter-rkqtn               2/2     Running   0          3m7s    172.18.0.5    kind-control-plane    <none>           <none>
+paymentservice-6f4dd9f457-6pscj   1/1     Running   0          98m     10.244.4.8    kind-worker3          <none>           <none>
+paymentservice-6f4dd9f457-qskd6   1/1     Running   0          98m     10.244.5.8    kind-worker2          <none>           <none>
+paymentservice-6f4dd9f457-vmmdw   1/1     Running   0          98m     10.244.3.8    kind-worker           <none>           <none>
