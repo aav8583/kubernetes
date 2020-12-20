@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice-reverse
+  labels:
+    app: paymentservice-reverse
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: paymentservice-reverse
+  template:
+    metadata:
+      labels:
+        app: paymentservice-reverse
+    spec:
+      containers:
+        - name: server
+          image: abvgdeej/paymentservice:v0.0.2
+          ports:
+            - containerPort: 50051
+          env:
+            - name: PORT
+              value: "50051"
