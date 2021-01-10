@@ -173,7 +173,8 @@
     stable          https://charts.helm.sh/stable
     jetstack        https://charts.jetstack.io
     
-    -- старое, не нужно, т.к. ставится флаг при установке через helm
+    ---------------
+    старое, не нужно, т.к. ставится флаг при установке через helm
     kubectl apply --validate=false -f .\cert-manager.crds.yaml
     customresourcedefinition.apiextensions.k8s.io/certificaterequests.cert-manager.io created
     customresourcedefinition.apiextensions.k8s.io/certificates.cert-manager.io created
@@ -181,7 +182,6 @@
     customresourcedefinition.apiextensions.k8s.io/clusterissuers.cert-manager.io created
     customresourcedefinition.apiextensions.k8s.io/issuers.cert-manager.io created
     customresourcedefinition.apiextensions.k8s.io/orders.acme.cert-manager.io created
-    --
 
 - установлен cert-manager
 
@@ -223,7 +223,7 @@
 - Создан манифест тестовых ресурсов test-resources.yaml
 
     
-    apiVersion: v1
+    ` apiVersion: v1
     kind: Namespace
     metadata:
       name: cert-manager-test
@@ -277,7 +277,7 @@
       Normal  Issuing    8s    cert-manager  The certificate has been successfully issued
       
     kubectl delete -f test-resources.yaml
-
+    `
     
 - Самостоятельное задание. Не хватает Issuer. Создан файл letsencrypt-prod.yaml
 
