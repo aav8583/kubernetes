@@ -6,3 +6,6 @@ abvgdeej Platform repository
  -  ДЗ №3: kubernetes-security/README.md
  
  -  ДЗ №5: kubernetes-volumes/README.md
+
+
+ -  ДЗ №8: kubernetes-monitoring/README.md
