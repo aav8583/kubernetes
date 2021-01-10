@@ -9,7 +9,7 @@ ingress:
     - name: chartmuseum.35.225.233.147.nip.io
       path: /
       tls: true
-      tlsSecret: chartmuseum.35.225.233.147.nip.io
+      tlsSecret: chartmuseum.secret
   env:
     open:
       DISABLE_API: false

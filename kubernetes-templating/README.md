@@ -286,7 +286,6 @@
     kind: ClusterIssuer
     metadata:
       name: letsencrypt-production
-      namespace: cert-manager
     spec:
       acme:
         # The ACME server URL
@@ -327,13 +326,13 @@ External IP nginx-ingress
       annotations:
         kubernetes.io/ingress.class: nginx
         kubernetes.io/tls-acme: "true"
-        certmanager.k8s.io/cluster-issuer: "letsencrypt-production"
-        certmanager.k8s.io/acme-challenge-type: http01
+        certmanager.io/cluster-issuer: "letsencrypt-production"
+        certmanager.io/acme-challenge-type: http01
       hosts:
         - name: chartmuseum.35.225.233.147.nip.io
           path: /
           tls: true
-          tlsSecret: chartmuseum.35.225.233.147.nip.io
+          tlsSecret: chartmuseum.secret
       env:
         open:
           DISABLE_API: false
