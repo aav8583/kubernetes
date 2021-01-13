@@ -326,8 +326,8 @@ External IP nginx-ingress
       annotations:
         kubernetes.io/ingress.class: nginx
         kubernetes.io/tls-acme: "true"
-        certmanager.io/cluster-issuer: "letsencrypt-production"
-        certmanager.io/acme-challenge-type: http01
+        cert-manager.io/cluster-issuer: "letsencrypt-production"
+        cert-manager.io/acme-challenge-type: http01
       hosts:
         - name: chartmuseum.35.225.233.147.nip.io
           path: /
@@ -369,7 +369,9 @@ External IP nginx-ingress
     NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                   APP VERSION
     chartmuseum     chartmuseum     1               2021-01-10 19:08:30.072734 +0300 MSK    deployed        chartmuseum-2.13.2      0.12.0
     
-Переход на сайт: https://chartmuseum.35.225.233.147.nip.io/ - сертификат выдан, но Win10Pro ему не доверяет. Проверено на cert-manager 0.16.1 и на 1.1.0, выдает Kubernetes Ingress Controller Fake Certificate.
+Переход на сайт: https://chartmuseum.35.225.233.147.nip.io/ - сертификат выдан
+
+
     
 ### Задача со * - Научитесь работать с chartmuseum
 
