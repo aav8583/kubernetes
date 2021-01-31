@@ -10,6 +10,6 @@ ingress:
       path: /
       tls: true
       tlsSecret: chartmuseum.secret
-  env:
-    open:
-      DISABLE_API: false
+env:
+  open:
+    DISABLE_API: false

@@ -371,26 +371,88 @@ External IP nginx-ingress
     
 Переход на сайт: https://chartmuseum.35.225.233.147.nip.io/ - сертификат выдан
 
+Команда на удаление, на всякий случай (случаи разные бывают):
 
+    helm uninstall chartmuseum stable/chartmuseum --namespace=chartmuseum
+
+![alt text](cert-manager/cert.png)
     
 ### Задача со * - Научитесь работать с chartmuseum
 
-Установка и удаление (заливка chart на chartmuseum)
+Установка и удаление (заливка chart на chartmuseum) !!!!!!!!!! ВОТ ЗДЕСЬ ЗАСТРЯЛ
 
     helm repo add chartmuseum https://chartmuseum.35.225.233.147.nip.io
+    "chartmuseum" has been added to your repositories
     
-    Error: looks like "https://chartmuseum.35.225.233.147.nip.io" is not a valid chart repository or cannot be reached: Get "https://chartmuseum.35.225.233.147.nip.io/index.yaml": x509: certificate is valid for ingress.local, not chartmuseum.35.225.233.147.nip.io
-       
-По идее, дальше нужно:     
-       
-    helm plugin install https://github.com/chartmuseum/helm-push
-    helm push mongodb/ chartmuseum 
     helm repo update
-    helm search repo mongodb
+    Hang tight while we grab the latest from your chart repositories...
+    ...Successfully got an update from the "harbor-demo" chart repository
+    ...Successfully got an update from the "chartmuseum" chart repository
+    ...Successfully got an update from the "jetstack" chart repository
+    ...Successfully got an update from the "stable" chart repository
+    Update Complete. ⎈Happy Helming!⎈
     
-    kubectl create ns mongodb
-    helm upgrade --install mongo chartmuseum/mongodb --wait --namespace=mongodb
-    kubectl get pods -n mongodb
+    git clone https://github.com/stakater-charts/mysql.git                                            
+    Cloning into 'mysql'...
+    remote: Enumerating objects: 187, done.
+    remote: Total 187 (delta 0), reused 0 (delta 0), pack-reused 187R
+    Receiving objects: 100% (187/187), 25.51 KiB | 791.00 KiB/s, done.
+    
+    cd mysql\mysql-storage
+    helm lint
+    ==> Linting .
+    [INFO] Chart.yaml: icon is recommended
+    1 chart(s) linted, 0 chart(s) failed
+    
+helm package . упакует чарт в архив
+
+    helm package .
+    Successfully packaged chart and saved it to: C:\kubernetes\otus-course\homeworks\mysql\mysql-storage\mysql-storage-1.0.6.tgz
+    
+    ls
+    
+    Mode                LastWriteTime         Length Name
+    ----                -------------         ------ ----
+    d-----       31.01.2021     15:27                templates
+    -a----       31.01.2021     15:27            275 Chart.yaml
+    -a----       31.01.2021     15:43           1134 mysql-storage-1.0.6.tgz
+    -a----       31.01.2021     15:27            285 values.yaml
+
+сформировался пакет mysql-storage-1.0.6.tgz, загрузжаем в chartmuseum:
+
+    curl --data-binary "@mysql-storage-1.0.6.tgz" https://chartmuseum.35.225.233.147.nip.io/api/charts
+    {"saved":true}
+    
+    helm repo update
+    Hang tight while we grab the latest from your chart repositories...
+    ...Successfully got an update from the "jetstack" chart repository
+    ...Successfully got an update from the "chartmuseum" chart repository
+    ...Successfully got an update from the "harbor-demo" chart repository
+    ...Successfully got an update from the "stable" chart repository
+    Update Complete. ⎈Happy Helming!⎈
+    
+    helm search repo mysql-storage
+    NAME                            CHART VERSION   APP VERSION     DESCRIPTION
+    chartmuseum/mysql-storage       1.0.6                           mysql-storage chart that runs on kubernetes
+
+Устанавливаем:
+    
+    kubectl create ns mysql
+    helm install mysql-storage chartmuseum/mysql-storage --namespace=mysql
+    NAME: mysql-storage
+    LAST DEPLOYED: Sun Jan 31 16:57:59 2021
+    NAMESPACE: mysql
+    STATUS: deployed
+    REVISION: 1
+    TEST SUITE: None
+   
+    kubectl get pods -n mysql
+    No resources found in mysql namespace.
+
+Удаляем:
+    
+    helm delete mysql-storage -n mysql
+    release "mysql-storage" uninstalled
     
 ### Harbor
 Нужно скачать и изменить values.yaml из https://github.com/goharbor/harbor-helm
