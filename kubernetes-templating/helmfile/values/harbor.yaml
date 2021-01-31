@@ -19,4 +19,3 @@ expose:
       cert-manager.io/cluster-issuer: "letsencrypt-production"
 notary:
   enabled: false
-harborAdminPassword: "Harbor12345"

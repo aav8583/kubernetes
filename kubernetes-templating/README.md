@@ -457,24 +457,28 @@ helm package . упакует чарт в архив
 ### Harbor
 Нужно скачать и изменить values.yaml из https://github.com/goharbor/harbor-helm
 
-    ---
     expose:
       type: ingress
       tls:
         enabled: true
+        certSource: auto
         secretName: "harbor.35.225.233.147.nip.io"
+        auto:
+          commonName: "core"
       ingress:
         hosts:
           core: "harbor.35.225.233.147.nip.io"
         controller: default
         annotations:
           kubernetes.io/ingress.class: nginx
-          kubernetes.io/tls-acme: "true"
-          certmanager.k8s.io/cluster-issuer: "letsencrypt-production"
-          certmanager.k8s.io/acme-challenge-type: http01
-    
+          ingress.kubernetes.io/ssl-redirect: "true"
+          ingress.kubernetes.io/proxy-body-size: "0"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/proxy-body-size: "0"
+          cert-manager.io/cluster-issuer: "letsencrypt-production"
     notary:
       enabled: false
+    harborAdminPassword: "Harbor12345"
       
 Добавлен репозиторий: 
     
@@ -487,10 +491,19 @@ namespace:
     
 Установка:
     
-    helm upgrade --install harbor harbor-demo/harbor --wait `
+    helm upgrade --install harbor harbor-demo/harbor `
         --namespace=harbor `
         --version=1.1.2 `
         -f harbor/values.yaml
+        
+Проверяем:
+![alt text](harbor/harbor.png)
+
+###Helmfile (задание со *)
+
+Helmfile описан в директории helmfile, нужные переменные для установки в helmfile/values.
+
+###Создаем свой helmchart
 
 ## Как запустить проект:
     С Божьей помощью.
