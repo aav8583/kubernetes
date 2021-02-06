@@ -379,7 +379,7 @@ External IP nginx-ingress
     
 ### Задача со * - Научитесь работать с chartmuseum
 
-Установка и удаление (заливка chart на chartmuseum) !!!!!!!!!! ВОТ ЗДЕСЬ ЗАСТРЯЛ
+Установка и удаление (заливка chart на chartmuseum)
 
     helm repo add chartmuseum https://chartmuseum.35.225.233.147.nip.io
     "chartmuseum" has been added to your repositories
@@ -504,6 +504,65 @@ namespace:
 Helmfile описан в директории helmfile, нужные переменные для установки в helmfile/values.
 
 ###Создаем свой helmchart
+
+Инициализируем структуру директории
+
+    helm create kubernetes-templating/hipster-shop
+
+Переносим в hipster-shop/templates yaml манифест приложения hipster-shop и удаляем лишние values.yaml и содержимое templates
+Чарт готов, устанавливаем в кластер: 
+
+    helm create kubernetes-templating/hipster-shop
+    helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop
+
+Разбиваем манифест на составляющие, начинаем с frontend:
+    
+    helm create kubernetes-templating/frontend
+
+Создадим файлы deployment.yaml, service.yaml и ingress.yaml, при этом последний напишем сами. 
+Из all-hipster-shop.yaml удаляем все связанное с frontend. Переустанавливаем:
+
+    helm delete hipster-shop -n hipster-shop
+    release "hipster-shop" uninstalled
+
+    helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop
+    Release "hipster-shop" does not exist. Installing it now.
+    NAME: hipster-shop
+    LAST DEPLOYED: Sun Feb  7 00:21:39 2021
+    NAMESPACE: hipster-shop
+    STATUS: deployed
+    REVISION: 1
+    TEST SUITE: None
+    
+Добавим values.yaml и заменим переменные в deployment 
+
+    image: gcr.io/google-samples/microservices-demo/frontend:v0.1.3
+на
+    
+    image: gcr.io/google-samples/microservices-demo/frontend:{{ .Values.image.tag }}
+
+и еще несколько переменных во всех написанных yaml манифестах. 
+
+Удаляем развернутый проект и прописываем зависимость в Chart.yaml:
+
+    dependencies:
+        - name: frontend
+          version: 0.1.0
+          repository: "file://../frontend"
+
+Обновляем зависимости: 
+    
+    helm dep update kubernetes-templating/hipster-shop
+
+В директории kubernetes-templating/hipster-shop/charts  появился архив frontend-0.1.0.tgz содержащий chart frontend 
+определенной версии и добавленный в chart hipster-shop как зависимость.
+Устанавливаем заново проект:
+    
+    helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop
+
+Чтобы поменять значение переменной в values, существует ключ --set:
+
+    helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop --set frontend.service.NodePort=31234
 
 ## Как запустить проект:
     С Божьей помощью.
