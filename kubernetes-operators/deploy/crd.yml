@@ -9,6 +9,12 @@ spec:
     - name: v1
       served: true            # Будет ли обслуживаться API-сервером данная версия
       storage: true           # Версия описания, которая будет сохраняться в etcd
+  names:                      # различные форматы имени объекта CR
+    kind: MySQL               # kind CR
+    plural: mysqls
+    singular: mysql
+    shortNames:
+      - ms
   validation:                 # в v1 это, вроде как, schema - обязательный параметр
     openAPIV3Schema:
       type: object
@@ -35,9 +41,4 @@ spec:
               type: string
             storage_size:
               type: string
-  names:                      # различные форматы имени объекта CR
-    kind: MySQL               # kind CR
-    plural: mysqls
-    singular: mysql
-    shortNames:
-      - ms
+
