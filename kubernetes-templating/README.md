@@ -602,13 +602,52 @@ Helmfile описан в директории helmfile, нужные перем�
 
 ###Kubecfg
 
+Нет проги для винды, надо мак
 
+    kubecfg version
+    kubecfg version: v0.14.0
+    jsonnet version: v0.14.0
+    client-go version: v0.0.0-master+2d32dcd
+
+    local kube = import "https://github.com/bitnami-labs/kubelibsonnet/raw/52ba963ca44f7a4960aeae9ee0fbee44726e481f/kube.libsonnet";
+
+Проверим, что манифесты генерируются корректно:
+
+    kubecfg show kubernetes-templating/kubecfg/services.jsonnet
+
+И установим их:
+
+    kubecfg update kubernetes-templating/kubecfg/services.jsonnet --namespace hipster-shop
+
+###Kustomization
+
+Для реализации возьмем emailservice, переместим блок из all-hipster-shop.yaml в kustomize/email
+Проверим Yaml на работоспособность
+
+    kubectl create namespace hipster-shop-prod
+    namespace/hipster-shop-prod created
+
+    kustomize build kubernetes-templating/kustomize/email/
+
+Жалуется на дубликат env, но уже настолько пофиг, что слов нет
+
+    kubectl apply -k .\kubernetes-templating\kustomize\overrides\hipster-shop\
+    service/dev-emailservice created
+    deployment.apps/dev-emailservice created
+
+    kubectl apply -k .\kubernetes-templating\kustomize\overrides\hipster-shop-prod\
+    service/prod-emailservice created
+    deployment.apps/prod-emailservice created
 
 ## Как запустить проект:
     С Божьей помощью.
 
 ## Как проверить работоспособность:
     Выполнить описанные выше шаги
+
+https://chartmuseum.35.225.233.147.nip.io/
+https://harbor.35.225.233.147.nip.io/
+https://shop.35.225.233.147.nip.io/
 
 ## PR checklist:
  - [x] Выставлен label с темой домашнего задания
