@@ -2,5 +2,8 @@ dependencies:
 - name: frontend
   repository: file://../frontend
   version: 0.1.0
-digest: sha256:edd290cc648e51899bf36bc7c4b647de4599c4253f7b10aecd82763f7248be6e
-generated: "2021-02-07T01:28:24.3149579+03:00"
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 12.3.0
+digest: sha256:8ef9e0adcd42aa66640e7c87d82dada04cb23634374d31fa60ae0486751dc742
+generated: "2021-02-07T02:46:56.2275566+03:00"

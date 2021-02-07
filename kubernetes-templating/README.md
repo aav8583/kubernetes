@@ -564,6 +564,46 @@ Helmfile описан в директории helmfile, нужные перем�
 
     helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop --set frontend.service.NodePort=31234
 
+###Создаем свой helm chart | Задание со *
+
+Установим доп зависимость Redis (requirements.yaml deprecated, ставим в Charts.yaml):
+
+    dependencies:
+    - name: redis
+      version: 12.3.0
+      repository: "https://charts.bitnami.com/bitnami"
+
+Идея (IDE) актуальной на момент написания домашки предложила добавить helm repo.
+Обновяем зависимости, запускаем проект:
+
+    helm delete hipster-shop -n hipster-shop
+    release "hipster-shop" uninstalled
+    
+    helm dep update kubernetes-templating/hipster-shop
+    Hang tight while we grab the latest from your chart repositories...
+    ...Successfully got an update from the "harbor-demo" chart repository
+    ...Successfully got an update from the "jetstack" chart repository
+    ...Successfully got an update from the "chartmuseum" chart repository
+    ...Successfully got an update from the "stable" chart repository
+    ...Successfully got an update from the "bitnami" chart repository
+    Update Complete. ⎈Happy Helming!⎈
+    Saving 2 charts
+    Downloading redis from repo https://charts.bitnami.com/bitnami
+    Deleting outdated charts
+    
+    helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop --set frontend.service.NodePort=31234
+    Release "hipster-shop" does not exist. Installing it now.
+    NAME: hipster-shop
+    LAST DEPLOYED: Sun Feb  7 03:13:26 2021
+    NAMESPACE: hipster-shop
+    STATUS: deployed
+    REVISION: 1
+    TEST SUITE: None
+
+###Kubecfg
+
+
+
 ## Как запустить проект:
     С Божьей помощью.
 
