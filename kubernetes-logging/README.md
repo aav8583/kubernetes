@@ -91,9 +91,95 @@
 
     helm repo add elastic https://helm.elastic.co
 
-Слайд 8
+Установим нужные нам компоненты, для начала без какой-либо дополнительной настройки
 
-## Как запустить проект:
+    kubectl create ns observability
+    # ElasticSearch
+    helm upgrade --install elasticsearch elastic/elasticsearch --namespace observability
+    # Kibana
+    helm upgrade --install kibana elastic/kibana --namespace observability
+    # Fluent Bit
+    helm upgrade --install fluent-bit stable/fluent-bit --namespace observability
+
+Поды и сервисы установились не там, где нужно было. Нужно обновить установку, пропишем нужные values:
+
+    tolerations:
+        - key: node-role
+          operator: Equal
+          value: infra
+          effect: NoSchedule
+    nodeSelector:
+        cloud.google.com/gke-nodepool: infra-pool
+
+применим изменения:
+
+    helm upgrade --install elasticsearch elastic/elasticsearch --namespace observability -f elasticsearch.values.yaml
+
+проверяем (процесс не быстрый):
+
+    kubectl get pods -n observability -o wide -l chart=elasticsearch -w
+    
+    NAME                     READY   STATUS    RESTARTS   AGE     IP          NODE                                           NOMINATED NODE   READINESS GATES
+    elasticsearch-master-0   1/1     Running   0          2m22s   10.28.2.2   gke-cluster-logging-infra-pool-8170fcc6-3tmw   <none>           <none>
+    elasticsearch-master-1   1/1     Running   0          4m18s   10.28.0.2   gke-cluster-logging-infra-pool-8170fcc6-2xvf   <none>           <none>
+    elasticsearch-master-2   1/1     Running   0          6m10s   10.28.3.2   gke-cluster-logging-infra-pool-8170fcc6-lxnq   <none>           <none>
+
+### Установка nginx ingress
+
+    kubectl create ns nginx-ingress
+    helm upgrade --install nginx-ingress stable/nginx-ingress  --namespace=nginx-ingress -f nginx-ingress.values.yml
+
+Узнаем EXTERNAL-IP
+
+    kubectl --namespace nginx-ingress get services -o wide nginx-ingress-controller
+    NAME                       TYPE           CLUSTER-IP    EXTERNAL-IP    PORT(S)                      AGE   SELECTOR
+    nginx-ingress-controller   LoadBalancer   10.32.2.174   34.71.35.199   80:31065/TCP,443:31785/TCP   11m   app.kubernetes.io/component=controller,app=nginx-ingress,release=nginx-ingress
+
+### Установка EFK стека | Kibana
+
+Создаем kibana.values.yaml, обновляем релиз:
+    
+    helm upgrade --install kibana elastic/kibana --namespace observability -f kibana.values.yaml
+
+Cмотрим логи fluentbit
+
+    kubectl logs fluent-bit-2vpz5 -n observability --tail 2
+    [2021/02/09 22:19:38] [error] [out_fw] no upstream connections available
+    [2021/02/09 22:19:38] [ warn] [engine] failed to flush chunk '1-1612808972.718240994.flb', retry in 947 seconds: task_id=7, input=tail.0 > output=forward.0
+
+Создаем fluentbit.values.yaml
+
+Пропишем правила для корректной работы, в этом разделе сразу опишу что могут быть повторения полей, для этого присвоим значение time_key, "лечение" от этого по ссылке https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+
+Применяем:
+
+    helm upgrade --install fluent-bit stable/fluent-bit --namespace observability  -f fluentbit.values.yaml
+
+    kubectl logs fluent-bit-2vpz5 -n observability --tail 2
+    [2021/02/10 20:36:50] [ info] [filter_kube] API server connectivity OK
+    [2021/02/10 20:36:50] [ info] [sp] stream processor started
+
+Создаем index pattern (https://www.elastic.co/guide/en/kibana/current/index-patterns.html#settings-create-pattern)
+
+### Мониторинг ElasticSearch
+
+Помимо установки ElasticSearch, важно отслеживать его показатели и вовремя понимать, что пора предпринять какие-либо 
+действия. Для мониторинга ElasticSearch будем использовать следующий prometheus-exporter. Обращаем внимание на tolerations.
+
+    helm upgrade --install prometheus stable/prometheus-operator --namespace=observability -f prometheus-operator.values.yaml
+    helm upgrade --install elasticsearch-exporter stable/elasticsearch-exporter --set es.uri=http://elasticsearch-master:9200 --set serviceMonitor.enabled=true --namespace=observability
+
+    helm uninstall prometheus --namespace=observability
+    helm uninstall elasticsearch-exporter --namespace=observability
+
+
+Пробрасываем порт:
+
+    kubectl get pods --namespace observability -l "app=elasticsearch-exporter" -o jsonpath="{.items[0].metadata.name}"
+    elasticsearch-exporter-5b6cc9b94d-cdh2m
+    kubectl port-forward elasticsearch-exporter-5b6cc9b94d-cdh2m 9108:9108 --namespace observability
+
+Заходим в графану http://grafana.34.71.35.199.xip.io/, импортируем дэшборд 4358, выбираем датасорс, 
 
 
 ## Как проверить работоспособность:
