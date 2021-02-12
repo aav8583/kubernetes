@@ -172,12 +172,13 @@ Cмотрим логи fluentbit
     helm uninstall prometheus --namespace=observability
     helm uninstall elasticsearch-exporter --namespace=observability
 
+    kubectl get pods -n observability
 
 Пробрасываем порт:
 
     kubectl get pods --namespace observability -l "app=elasticsearch-exporter" -o jsonpath="{.items[0].metadata.name}"
-    elasticsearch-exporter-5b6cc9b94d-cdh2m
-    kubectl port-forward elasticsearch-exporter-5b6cc9b94d-cdh2m 9108:9108 --namespace observability
+    elasticsearch-exporter-5b6cc9b94d-ckdln
+    kubectl port-forward elasticsearch-exporter-5b6cc9b94d-ckdln 9108:9108 --namespace observability
 
 Заходим в графану http://grafana.34.71.35.199.xip.io/, импортируем дэшборд 4358, выбираем датасорс, 
 
