@@ -155,11 +155,13 @@ Cмотрим логи fluentbit
 
     helm upgrade --install fluent-bit stable/fluent-bit --namespace observability  -f fluentbit.values.yaml
 
-    kubectl logs fluent-bit-2vpz5 -n observability --tail 2
+    kubectl logs fluent-bit-fw8hk -n observability --tail 2
     [2021/02/10 20:36:50] [ info] [filter_kube] API server connectivity OK
     [2021/02/10 20:36:50] [ info] [sp] stream processor started
 
 Создаем index pattern (https://www.elastic.co/guide/en/kibana/current/index-patterns.html#settings-create-pattern)
+
+![alt text](images/kibana1.png)
 
 ### Мониторинг ElasticSearch
 
@@ -174,17 +176,78 @@ Cмотрим логи fluentbit
 
     kubectl get pods -n observability
 
-Пробрасываем порт:
+Заходим в графану http://grafana.34.71.35.199.xip.io/, импортируем дэшборд 4358, выбираем датасорс, видим:
 
-    kubectl get pods --namespace observability -l "app=elasticsearch-exporter" -o jsonpath="{.items[0].metadata.name}"
-    elasticsearch-exporter-5b6cc9b94d-ckdln
-    kubectl port-forward elasticsearch-exporter-5b6cc9b94d-ckdln 9108:9108 --namespace observability
+![alt text](images/grafana1.png)
 
-Заходим в графану http://grafana.34.71.35.199.xip.io/, импортируем дэшборд 4358, выбираем датасорс, 
+Проверим, что метрики действительно собираются корректно. Сделайте drain одной из нод infra-pool
 
+    kubectl get nodes
+    NAME                                             STATUS   ROLES    AGE     VERSION
+    gke-cluster-logging-default-pool-e5144c9f-s2ch   Ready    <none>   6d14h   v1.17.14-gke.1600
+    gke-cluster-logging-infra-pool-8170fcc6-2xvf     Ready    <none>   6d14h   v1.17.14-gke.1600
+    gke-cluster-logging-infra-pool-8170fcc6-3tmw     Ready    <none>   6d14h   v1.17.14-gke.1600
+    gke-cluster-logging-infra-pool-8170fcc6-lxnq     Ready    <none>   6d14h   v1.17.14-gke.1600
+    
+    kubectl drain gke-cluster-logging-infra-pool-8170fcc6-2xvf --ignore-daemonsets
+    node/gke-cluster-logging-infra-pool-8170fcc6-2xvf cordoned
+    error: unable to drain node "gke-cluster-logging-infra-pool-8170fcc6-2xvf", aborting command...
+
+    There are pending nodes to be drained:
+    gke-cluster-logging-infra-pool-8170fcc6-2xvf
+    error: cannot delete Pods with local storage (use --delete-emptydir-data to override): observability/prometheus-prometheus-prometheus-oper-prometheus-0
+
+"Статус Cluster Health остался зеленым, но количество нод в кластере уменьшилось до двух штук." - у меня ничего не уменьшилось.
+
+**Господа преподаватели и организаторы курса, корректируйте свои методички! Либо у нас разные кластера получились, и 
+вам нужно детальнее писать инструкции, либо произошли некие изменения в работе GCP. То, что над одной операцией корпишь 
+и пытаешься починить ошибку по несколько часов или дней - это никуда не годится! 
+Просмотрите статистику по сданным домашкам за прошлые годы и увидите, что именно эту сделали единицы - повод задуматься!**
+
+**Дополнительно: очень много вещей уже deprecated, и в данной домашке тоже: helm чарты prometheus-operator и elk exporter.
+Три дня потратил на то, чтобы разобраться, что вы вообще хотите видеть в этой домашке, что за экспортеры, serviceMonitorSelectors.
+С помощью гугла запустилось. Профессия у нас такая, да, я не спорю - постоянно искать решение, но не когда платишь деньги за курс, 
+на котором ожидаешь получить актуальную информацию и полезные задачи. Задумка именно в этой домашке интересная и полезная, реализация - не очень.**
+
+Возвращаем ноды в строй:
+
+    kubectl uncordon gke-cluster-logging-infra-pool-8170fcc6-2xvf
+    node/gke-cluster-logging-infra-pool-8170fcc6-2xvf uncordoned
+
+Метрики:
+- unassigned_shards - количество shard, для которых не нашлось подходящей ноды, их наличие сигнализирует о проблемах
+- jvm_memory_usage - высокая загрузка (в процентах от выделенной памяти) может привести к замедлению работы кластера
+- number_of_pending_tasks - количество задач, ожидающих выполнения. Значение метрики, отличное от нуля, может 
+  сигнализировать о наличии проблем внутри кластера
+
+### EFK | nginx ingress
+Чтобы логи ingress появились в кибане, добавляем в nginx-ingress.values.yml два дополнительных блока (отмечены комментариями).
+
+    helm upgrade --install nginx-ingress stable/nginx-ingress  --namespace=nginx-ingress -f nginx-ingress.values.yml
+
+Далее следует много рандомного кликания мышью, чтобы получить дэшборд, потому что описания в методичке нормального нет (**СНОВА!**).
+
+![alt text](images/nginx-dashboard.png)
+
+### Loki
+Установка Loki:
+
+    helm repo add grafana https://grafana.github.io/helm-charts
+    helm repo update
+
+    helm upgrade --install loki grafana/loki-stack --namespace=observability
+    helm upgrade --install promtail grafana/promtail --set "loki.serviceName=loki" --namespace=observability -f loki.promtail.values.yaml
+
+    helm uninstall promtail --namespace=observability
+
+Обновим prometheus-operator:
+
+    helm upgrade --install prometheus stable/prometheus-operator --namespace=observability -f prometheus-operator.values.yaml
+
+Добавим дэшборд с метриками из prometheus и логами из Loki, выведем в json.
 
 ## Как проверить работоспособность:
-
+Поверить на слово.
 
 ## PR checklist:
  - [x] Выставлен label с темой домашнего задания

@@ -1,5 +1,9 @@
 tolerations:
-  - operator: "Exists"
+  #- operator: "Exists"
+  - key: node-role
+    operator: Equal
+    value: infra
+    effect: NoSchedule
 
 backend:
   type: es
@@ -16,5 +20,5 @@ rawConfig: |
     Name     modify
     Match    *
     Remove   time
-    Remove   @timestamp
-#    Rename   @timestamp time_key
+    Rename   @timestamp time_key
+#    Remove   @timestamp
