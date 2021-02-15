@@ -9,3 +9,4 @@ abvgdeej Platform repository
  -  ДЗ №6: kubernetes-templating/README.md
  -  ДЗ №7: kubernetes-operators/README.md
  -  ДЗ №8: kubernetes-monitoring/README.md
+ -  ДЗ №9: kubernetes-logging/README.md

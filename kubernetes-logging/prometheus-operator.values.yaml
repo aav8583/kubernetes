@@ -1,0 +1,53 @@
+grafana:
+  adminPassword: qwerty123
+  ingress:
+    enabled: true
+    hosts:
+      - grafana.34.71.35.199.xip.io
+    annotations: {
+      kubernetes.io/ingress.class: nginx
+    }
+    path: /
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+
+prometheus:
+  enabled: true
+  ingress:
+    enabled: true
+    hosts:
+      - prometheus.34.71.35.199.xip.io
+  prometheusSpec:
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+    #без заполнения секции ниже не экспортировались метрики
+    serviceMonitorSelector:
+      matchExpressions:
+        - key: app
+          operator: In
+          values:
+            - alertmanager
+            - elasticsearch-exporter  #есть подозрение, что не экспортировались метрики именно из-за отсутствия этой строки
+            - exporter-coredns
+            - exporter-kube-controller-manager
+            - exporter-kube-dns
+            - exporter-kube-etcd
+            - exporter-kube-scheduler
+            - exporter-kube-state
+            - exporter-kubelets
+            - exporter-kubernetes
+            - exporter-node
+            - grafana
+            - prometheus
+            - prometheus-operator
+            - nginx-ingress
+    tolerations:
+      - key: node-role
+        operator: Equal
+        value: infra
+        effect: NoSchedule
+    nodeSelector:
+      cloud.google.com/gke-nodepool: infra-pool
