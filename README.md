@@ -10,3 +10,4 @@ abvgdeej Platform repository
  -  ДЗ №7: kubernetes-operators/README.md
  -  ДЗ №8: kubernetes-monitoring/README.md
  -  ДЗ №9: kubernetes-logging/README.md
+ -  ДЗ №14: kubernetes-production-clusters/README.md
