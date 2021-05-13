@@ -233,7 +233,7 @@ ey-treshhold - количество ключей (хешей мастер клю
 
 ### Обновление авторизации через k8s
 
-Включение авторизации через кубер, подробнее см. 37 слайд, видео с 1:53:40. 
+Включение авторизации через кубер, подробнее см. 37 слайд, видео с 1:51:40. 
 
     kubectl exec -it vault-0 -n vault -- vault auth enable kubernetes
 
@@ -250,7 +250,7 @@ ey-treshhold - количество ключей (хешей мастер клю
     # Create a service account, 'vault-auth'
     kubectl create serviceaccount vault-auth -n vault
     # Update the 'vault-auth' service account
-    kubectl apply --filename vault-auth-service-account.yml -n vault
+    kubectl apply -f vault-auth-service-account.yml -n vault
 
 Подготовлены переменные для записи в конфиг кубер авторизации (ОС Win10, PowerShell)
 
@@ -262,10 +262,23 @@ ey-treshhold - количество ключей (хешей мастер клю
 Запись конфига в vault:
 
     kubectl exec -it vault-0 -n vault -- vault write auth/kubernetes/config token_reviewer_jwt="$ENV:SA_JWT_TOKEN" kubernetes_host="$ENV:K8S_HOST" kubernetes_ca_cert="$ENV:SA_CA_CRT"
-    Success! Data written to: auth/kubernetes/config
+
+- Примечание: у меня возникла проблема с сертификатом неизвестной природы. В .kube/config указан тот же самый серт, 
+  который записывается в $ENV:SA_CA_CRT, но сервис vault отдает ошибку при попытке получения клиентского токена курлом:
+
+
+    kubectl logs service/vault -n vault
+    2021-05-13T12:57:17.922Z [ERROR] auth.kubernetes.auth_kubernetes_d144e488: login unauthorized due to: Post "https://84.201.147.47/apis/authentication.k8s.io/v1/tokenreviews": x509: certificate signed by unknown authority
+
+Поэтому я погуглил и решил воспользоваться флагом `-tls-skip-verify` и не указывать серт в `vault write`
+
+    kubectl exec -it vault-0 -n vault -- vault write -tls-skip-verify auth/kubernetes/config token_reviewer_jwt="$ENV:SA_JWT_TOKEN" kubernetes_host="$ENV:K8S_HOST"
 
 Создан файл политики otus-policy.hcl, создана сама политика и роль в vault. Сейчас нельзя копировать в рутовый каталог, 
 поэтому копирование произведено в /tmp
+
+<details>
+     <summary>УКАЗАНЫ НЕ ПРАВИЛЬНЫЕ КОМАНДЫ, РАБОТАТЬ НЕ БУДЕТ </summary>
 
     kubectl cp otus-policy.hcl vault/vault-0:./tmp
     kubectl exec -it vault-0 -n vault -- vault policy write otus-policy /tmp/otus-policy.hcl
@@ -310,9 +323,11 @@ ey-treshhold - количество ключей (хешей мастер клю
 
 Поэтому прописываем ns vault:
 
+</details>
+
     kubectl cp otus-policy.hcl vault/vault-0:./tmp
     kubectl exec -it vault-0 -n vault -- vault policy write otus-policy /tmp/otus-policy.hcl
-    kubectl exec -it vault-0 -n vault -- vault write auth/kubernetes/role/otus bound_service_account_names=vault-auth bound_service_account_namespaces=vault policies=otus-policy ttl=24h
+    kubectl exec -it vault-0 -n vault -- vault write -tls-skip-verify auth/kubernetes/role/otus bound_service_account_names=vault-auth bound_service_account_namespaces=vault policies=otus-policy ttl=24h
 
 Повторяем шаги, создаем под:
 
@@ -328,6 +343,9 @@ ey-treshhold - количество ключей (хешей мастер клю
     KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
     curl --request POST --data '{"jwt": "'$KUBE_TOKEN'", "role": "otus"}' $VAULT_ADDR/v1/auth/kubernetes/login | jq
 
+<details>
+    <summary>Проблемы с сертификатом кластера без скипа проверки серта. Есть подозрение, что в этом как-то замешан Istio, т.к. в их конфигах фигурирует "tokenreviews"</summary>    
+
     {
         "errors": [
             "permission denied"
@@ -337,7 +355,216 @@ ey-treshhold - количество ключей (хешей мастер клю
     kubectl logs service/vault -n vault
     2021-05-13T12:57:17.922Z [ERROR] auth.kubernetes.auth_kubernetes_d144e488: login unauthorized due to: Post "https://84.201.147.47/apis/authentication.k8s.io/v1/tokenreviews": x509: certificate signed by unknown authority
 
-=\
+Помогло https://stackoverflow.com/questions/53663455/certificate-error-when-deploying-hashicorp-vault-with-kubernetes-auth-method-on
+
+</details>
+
+![img.png](img.png)
+
+    "auth": {
+        "client_token": "s.pnvAyCL6oJZ4ARKHiOwd3NYY",
+        "accessor": "rH8AkiO1OFqlK5qZdRGfi8UO",
+
+Результаты чтения секретов:
+
+    curl --header "X-Vault-Token:s.pnvAyCL6oJZ4ARKHiOwd3NYY" $VAULT_ADDR/v1/otus/otus-ro/config
+    {"request_id":"d24be16f-7783-3cb1-cae2-6faba6bcaba6","lease_id":"","renewable":false,"lease_duration":2764800,"data":{"password":"asajkjkahs","username":"otus"},"wrap_info":null,"warnings":null,"auth":null}
+    
+    curl --header "X-Vault-Token:s.pnvAyCL6oJZ4ARKHiOwd3NYY" $VAULT_ADDR/v1/otus/otus-rw/config
+    {"request_id":"4712d2e4-9c7a-b8da-2c16-c13875229d87","lease_id":"","renewable":false,"lease_duration":2764800,"data":{"password":"asajkjkahs","username":"otus"},"wrap_info":null,"warnings":null,"auth":null}
+
+Результаты записи:
+
+    curl -H "X-Vault-Token: s.pnvAyCL6oJZ4ARKHiOwd3NYY" -H "Content-Type: application/json" -X POST -d '{"bar":"baz"}' $VAULT_ADDR/v1/otus/otus-ro/config
+    {"errors":["1 error occurred:\n\t* permission denied\n\n"]}
+
+    curl -H "X-Vault-Token: s.pnvAyCL6oJZ4ARKHiOwd3NYY" -H "Content-Type: application/json" -X POST -d '{"bar":"baz"}' $VAULT_ADDR/v1/otus/otus-rw/config
+    {"errors":["1 error occurred:\n\t* permission denied\n\n"]}
+
+    curl -H "X-Vault-Token: s.pnvAyCL6oJZ4ARKHiOwd3NYY" -H "Content-Type: application/json" -X POST -d '{"bar":"baz"}' $VAULT_ADDR/v1/otus/otus-rw/config1
+
+Ответы на вопросы:
+- запись в ro невозможна - только чтение
+- запись в rw невозможна - политика не настроена на обновление секрета
+- в config1 запись удалась, т.к. это добавление нового
+
+Подробнее о политиках: https://learn.hashicorp.com/tutorials/vault/policies
+
+политика rw должна выглядеть так:
+
+    path "otus/otus-rw/*" {
+        capabilities = ["read", "create", "list", "update"]
+    }
+
+### Пример с nginx
+
+    git clone https://github.com/hashicorp/vault-guides.git
+
+Отредактированы configmap.yaml и example-k8s-spec.yaml, помещены в директорию configs-k8s вместе с ранее созданным vault-auth-service-account.yaml
+
+configmap - используется политика для vault с шаблоном файла html для nginx, в котором указаны переменные для получения 
+кредов из vault-а. А в example* фактически разворачивание nginx и подцепление конфигмепа как volume в страничку nginx. 
+Подробнее в README.md примера.
+
+    kubectl apply -f .\configmap.yaml -n vault
+    kubectl apply -f .\example-k8s-spec.yaml -n vault
+    kubectl port-forward pod/vault-agent-example 8080:80 -n vault
+
+![img_1.png](img_1.png)
+
+Создан CA на базе vault
+
+Включим pki секретс в vault:
+
+    kubectl exec -it vault-0 -- vault secrets enable pki
+    kubectl exec -it vault-0 -- vault secrets tune -max-lease-ttl=87600h pki
+    kubectl exec -it vault-0 -- vault write -field=certificate pki/root/generate/internal \
+    common_name="example.ru" ttl=87600h > CA_cert.crt
+
+Если что, для удаления можно воспользоваться:
+
+    curl \
+    --header "X-Vault-Token: s.NW5XyfagsqL1ongygqq6NOuv" \
+    --request DELETE \
+    $VAULT_ADDR/v1/pki/root
+
+Прописаны urls для ca и отозванных сертификатов:
+
+    kubectl exec -it vault-0 -- vault write pki/config/urls \
+    issuing_certificates="http://vault:8200/v1/pki/ca" \
+    crl_distribution_points="http://vault:8200/v1/pki/crl"
+
+Создан промежуточный сертификат
+
+    kubectl exec -it vault-0 -- vault secrets enable --path=pki_int pki
+    kubectl exec -it vault-0 -- vault secrets tune -max-lease-ttl=87600h pki_int
+    kubectl exec -it vault-0 -- vault write -format=json pki_int/intermediate/generate/internal \
+    common_name="example.ru Intermediate Authority" | jq -r '.data.csr' > pki_intermediate.csr
+
+Прописан промежуточный сертификат в vault
+
+    kubectl cp pki_intermediate.csr vault-0:/home/vault/
+    kubectl exec -it vault-0 -- vault write -format=json pki/root/sign-intermediate \
+    csr=@/home/vault/pki_intermediate.csr \
+    format=pem_bundle ttl="43800h" | jq -r '.data.certificate' > intermediate.cert.pem
+    kubectl cp intermediate.cert.pem vault-0:/home/vault/
+    kubectl exec -it vault-0 -- vault write pki_int/intermediate/set-signed certificate=@/home/vault/intermediate.cert.pem
+
+Созданы и отозваны новые сертификаты, создана роль для выдачи сертификатов:
+
+    kubectl exec -it vault-0 -- vault write pki_int/roles/example-dot-ru \
+    allowed_domains="example.ru" allow_subdomains=true max_ttl="720h"
+
+Создан сертификат:
+
+    kubectl exec -it vault-0 -- vault write pki_int/issue/example-dot-ru common_name="gitlab.example.ru" ttl="24h"
+
+    Key                 Value
+    ---                 -----
+    ca_chain            [-----BEGIN CERTIFICATE-----
+    MIIDnDCCAoSgAwIBAgIUSStASL0avna3F8Zu35flNBW/OT4wDQYJKoZIhvcNAQEL
+    BQAwFTETMBEGA1UEAxMKZXhhbXBsZS5ydTAeFw0yMTAzMDMyMTEwNDlaFw0yNjAz
+    MDIyMTExMTlaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+    dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMPfCvJzAhhN
+    IGAj2qJowyaWN4KYAK7AOFoqlOgupk9r2Z+5ViDomhwPo49oglwB4MMBMem2eeyX
+    0Zd5vB1RLd2C56N/Z3trJfPLbzAVapTscd0O4nGoFaugzJUZJ7iax7bhWGUqAWHr
+    BKRZouXtDkaEdarkgopTq0riic5RBoxFJSnWT09vCv8SfDXCnQK9q6KoUKAmGTnn
+    YBdI8qIodUWMF0weegDbjnrUeP4WGJ75dGts26AQHR08MNz6r408RumRN2+U/wSJ
+    coX4jga4yzlr5YFkTRVnFIwDgrGQ4+a7Sc608YYx/AF92pfaVeITn9leV2LJMhga
+    3caNVNjQ7Q8CAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+    AwEB/zAdBgNVHQ4EFgQUNN9t7HpZV5lQguM6cKP7pnGg3a4wHwYDVR0jBBgwFoAU
+    /Yot3eNJT2YlgCiryvIcNP9gnkMwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+    hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+    aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+    023qah1fKzF8JKvnJ5c7/GvSaWA+AIKDEUoYtqfjDEada0rKmLyaBNDfeP7nIKiS
+    wPKbJw2wrDDRkg+qiXIkKeqZg1sL/4fIOrAG1ArxWAjOKcWLivyTxtKDdUcm1kwV
+    drZdRM5mNZVG1Rbj01GhyhEXlw8BnNw0wmsR+cidUF4iQTpPef2Gro7c5mUfxfoq
+    srQdR/jUiGxHXIvOGxxXAcBClOKqQR0wrg6a1EjMwYj52lkcG3noWhfpbdeSeOsE
+    48W76S9vVcpPR7nqxNDA5TO7YmVXPEUsjnsfdBKy9QnUSN+EB/yhbsc8Kv3bN5SW
+    u4xv5PaIcODoG7z05C8imw==
+    -----END CERTIFICATE-----]
+    certificate         -----BEGIN CERTIFICATE-----
+    MIIDZzCCAk+gAwIBAgIUXukx9lvMESRRql/vu2lKxdfoibwwDQYJKoZIhvcNAQEL
+    BQAwLDEqMCgGA1UEAxMhZXhhbXBsZS5ydSBJbnRlcm1lZGlhdGUgQXV0aG9yaXR5
+    MB4XDTIxMDMwMzIxMTYzMVoXDTIxMDMwNDIxMTcwMVowHDEaMBgGA1UEAxMRZ2l0
+    bGFiLmV4YW1wbGUucnUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC2
+    sI1ctS0z2PixOzqmNEXf5BV/fA3CQNjkbnVAcEHJXPlt4rFVOicbUzh1rXnlQI8U
+    4aHqBX0W/eSWF8MF7Q02a7cJenKycypPMZuONMU3fhg6zzZb4kaUnNvPi+lEqeUj
+    yfrnv/k5yraxTPQY8u4ymkrzy+FjIzOTCo5xEa1fl9ejdlZWykS53FAG4nZxDSaZ
+    NmZgC6wI0RDQbBQfLWoIXzjsqKvLDY78L70RIqxX7KYOoVWNGVcPWDPH/WXZ+ZWf
+    wuhhqoFou3chHnVuyUbnNqu4j+STo0X0XG2HKjyqWaNItakEkA3wxHEaRGSPzqwA
+    Nagvtsri1efzgcWFD56XAgMBAAGjgZAwgY0wDgYDVR0PAQH/BAQDAgOoMB0GA1Ud
+    JQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNVHQ4EFgQUTmfJEcEQ1qC243sO
+    yeGRzd8Kc2swHwYDVR0jBBgwFoAUNN9t7HpZV5lQguM6cKP7pnGg3a4wHAYDVR0R
+    BBUwE4IRZ2l0bGFiLmV4YW1wbGUucnUwDQYJKoZIhvcNAQELBQADggEBAGmbLqnY
+    IFoS3MAxVET6NKw5j3cytLBjCQ59UvEcFChmwxzeWQfdMz2PFl1SM0jHglSiIcsS
+    ACZszojBErbi5wX7wtKBAz36Wz2dRbpCwpfVmWSmBXnQi3jOoxYxR/QKghHARhjO
+    VNXES4Ej5iv8uCqSts5BXEhw5WJBVcfjDYYlJ+NBFVzlfxIZdAcBNGwUKKY3a/U1
+    0co7b1c4Fw1W0gi3iDC/ZQkDOdHMWKqVaxHiB2mbRXx5+VUl62uRMR9qM1CAR7Vs
+    bO+Fb1ws3i/EtmFOA44GdzK1nLNPZQ23RBu7NQEpyclAlDt/N888vxLLZlPZjiaq
+    vK/V94mBRJQLyTw=
+    -----END CERTIFICATE-----
+    expiration          1614892621
+    issuing_ca          -----BEGIN CERTIFICATE-----
+    MIIDnDCCAoSgAwIBAgIUSStASL0avna3F8Zu35flNBW/OT4wDQYJKoZIhvcNAQEL
+    BQAwFTETMBEGA1UEAxMKZXhhbXBsZS5ydTAeFw0yMTAzMDMyMTEwNDlaFw0yNjAz
+    MDIyMTExMTlaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+    dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMPfCvJzAhhN
+    IGAj2qJowyaWN4KYAK7AOFoqlOgupk9r2Z+5ViDomhwPo49oglwB4MMBMem2eeyX
+    0Zd5vB1RLd2C56N/Z3trJfPLbzAVapTscd0O4nGoFaugzJUZJ7iax7bhWGUqAWHr
+    BKRZouXtDkaEdarkgopTq0riic5RBoxFJSnWT09vCv8SfDXCnQK9q6KoUKAmGTnn
+    YBdI8qIodUWMF0weegDbjnrUeP4WGJ75dGts26AQHR08MNz6r408RumRN2+U/wSJ
+    coX4jga4yzlr5YFkTRVnFIwDgrGQ4+a7Sc608YYx/AF92pfaVeITn9leV2LJMhga
+    3caNVNjQ7Q8CAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+    AwEB/zAdBgNVHQ4EFgQUNN9t7HpZV5lQguM6cKP7pnGg3a4wHwYDVR0jBBgwFoAU
+    /Yot3eNJT2YlgCiryvIcNP9gnkMwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+    hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+    aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+    023qah1fKzF8JKvnJ5c7/GvSaWA+AIKDEUoYtqfjDEada0rKmLyaBNDfeP7nIKiS
+    wPKbJw2wrDDRkg+qiXIkKeqZg1sL/4fIOrAG1ArxWAjOKcWLivyTxtKDdUcm1kwV
+    drZdRM5mNZVG1Rbj01GhyhEXlw8BnNw0wmsR+cidUF4iQTpPef2Gro7c5mUfxfoq
+    srQdR/jUiGxHXIvOGxxXAcBClOKqQR0wrg6a1EjMwYj52lkcG3noWhfpbdeSeOsE
+    48W76S9vVcpPR7nqxNDA5TO7YmVXPEUsjnsfdBKy9QnUSN+EB/yhbsc8Kv3bN5SW
+    u4xv5PaIcODoG7z05C8imw==
+    -----END CERTIFICATE-----
+    private_key         -----BEGIN RSA PRIVATE KEY-----
+    MIIEpQIBAAKCAQEAtrCNXLUtM9j4sTs6pjRF3+QVf3wNwkDY5G51QHBByVz5beKx
+    VTonG1M4da155UCPFOGh6gV9Fv3klhfDBe0NNmu3CXpysnMqTzGbjjTFN34YOs82
+    W+JGlJzbz4vpRKnlI8n657/5Ocq2sUz0GPLuMppK88vhYyMzkwqOcRGtX5fXo3ZW
+    VspEudxQBuJ2cQ0mmTZmYAusCNEQ0GwUHy1qCF847Kiryw2O/C+9ESKsV+ymDqFV
+    jRlXD1gzx/1l2fmVn8LoYaqBaLt3IR51bslG5zaruI/kk6NF9Fxthyo8qlmjSLWp
+    BJAN8MRxGkRkj86sADWoL7bK4tXn84HFhQ+elwIDAQABAoIBAQClEcGpEstVHacX
+    /LxxkKnSMvR5zE1iR9WyEVxAbS4EE84MS9iPeYv8VKWfLrAFROADrhvuqCbur1nr
+    hGzi3d4iXhF0rv8T3ptMEzbKt0O7cGPUP4aOX1YG0fSLA5AySpCQVeAvpnY6kb+h
+    VDb6lAZGEsPGpWFxgk0Hf3JVF/PfenrwZUGrktszFF3l9r0wXaiiqHL6FGnjnit8
+    n5BKqKbHd3B+gOcbtyAcZD6ZwyuTGEyKKGfQR7mKYjXF5VbmJ1SlyTmKjhT30jHy
+    LoiLexk9Cly9OZdms7wGKPY3YSmUYVvUaXeqoCtH/ZGPKfFhN3XR7ndQcn9WH3Z6
+    be7+n1sBAoGBAMR2C9d6m0m0Pn+HbdAIl/svi0o/78TwKTQ13KeuF/7MpgyOiKLF
+    emTSiz+3eLGztXdseWwdDL52Ui+y2/sLpUTjQVA1/QPm/EHcrLecr61gGET+cw3G
+    OdJzyQ3Z/4dHVzXwqPzIfkFjMa3POO8roM8X8sjnkiHvi5sRiFXhumIJAoGBAO4O
+    FLcXlNbjp9cGP7iRtKESBlJGZcJ4bAh6+IHFbtmg/yOyF5J6aVWn3B/XIbCrzrx9
+    0eymsiXVtFMttQp4kMr5G9j3jzIV4Q80ZQlzLq0jFSjJXzkF8fthJpWPC7dMsHWM
+    33PGGZb60wzV467kly3dhXGDT4vuPviXHOE7GaOfAoGAOyjtAfM6xeQQGekXSVj9
+    Ize68x3zvtMvJTi+/INxWFoZ+pgFTza2V5wLMKG4J5LdJ1wz6DmLN+N7dj+e/KcS
+    Gn9wkI3hZgZtmguwuw3k3Qmd5VDWJqS1jsktFw25Y+w4t9aDnLNnSZtsP1GybFsv
+    7ozgoF0TZUK0QHr0GiCCNrkCgYEA3Z1oNYcTffXT436ixZ2Hjcds8R0uUJuw3zgz
+    rwPxDVMvErkR7sBc3Wv2pgGuEH3xaVKsomYRRN2tER5lAwl4qiy8ewEEYvkxWulJ
+    AkIjevVFFoJZTom1W3N26xaPLqaLQ/PQdkQ+wGpjHfjlDIUsJHusZh97Z2Z1YxGy
+    xg8x8DsCgYEAjHeMKuIPXj2yCYYumvBMrhu5SrgJfvXeJ1UwWjb2VYMed9joKba9
+    PdCXG4c9bvxhA1S0CbCUVOhVVlFI+m1aOkm6k2sOTpUFre+SsW8EOTkiDkgI9fbm
+    3NSe6MJYiv136crWlyDAOakK12IDe1JlKUtavTVCaMncuI4vTl9/AFQ=
+    -----END RSA PRIVATE KEY-----
+    private_key_type    rsa
+    serial_number       5e:e9:31:f6:5b:cc:11:24:51:aa:5f:ef:bb:69:4a:c5:d7:e8:89:bc
+
+Отозван сертификат:
+
+    kubectl exec -it vault-0 -- vault write pki_int/revoke serial_number="5e:e9:31:f6:5b:cc:11:24:51:aa:5f:ef:bb:69:4a:c5:d7:e8:89:bc"
+    Key                        Value
+    ---                        -----
+    revocation_time            1614806282
+    revocation_time_rfc3339    2021-03-03T21:18:02.559895629Z
+    isie@isie-VirtualBox:~/otus/IsieIam_platform/kubernetes-vault(kubernetes-vault)$
 
 ## Как запустить проект:
 
